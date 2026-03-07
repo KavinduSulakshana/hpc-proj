@@ -1,18 +1,5 @@
 /**
  * OpenMP Parallel Heat Equation Solver
- * 2D Plate Temperature Evolution Simulation
- *
- * Physics: dT/dt = alpha * (d²T/dx² + d²T/dy²)  (2D Heat Equation)
- * Method:  FTCS (Forward-Time Central-Space) Finite Difference
- * Parallelization: OpenMP collapse(2) over spatial loops
- *
- * Domain:  [0, Lx] x [0, Ly]  (rectangular plate)
- * IC:      T(x,y,0) = 100 * sin(pi*x/Lx) * sin(pi*y/Ly)
- * BC:      T = 0 on all four edges (Dirichlet)
- *
- * Analytical solution:
- *   T(x,y,t) = 100 * exp(-alpha*pi²*(1/Lx²+1/Ly²)*t)
- *              * sin(pi*x/Lx) * sin(pi*y/Ly)
  */
 
 #include <iostream>
@@ -61,13 +48,13 @@ void initialize(std::vector<double>& T) {
 
     #pragma omp parallel for
     for (int j = 0; j < NY; j++) {
-        T[idx(0,    j)] = 0.0;   // left  edge  (x = 0)
+        T[idx(0,    j)] = 0.0;   // left edge  (x = 0)
         T[idx(NX-1, j)] = 0.0;   // right edge  (x = Lx)
     }
     #pragma omp parallel for
     for (int i = 0; i < NX; i++) {
         T[idx(i, 0   )] = 0.0;   // bottom edge (y = 0)
-        T[idx(i, NY-1)] = 0.0;   // top    edge (y = Ly)
+        T[idx(i, NY-1)] = 0.0;   // top edge (y = Ly)
     }
 }
 
@@ -148,7 +135,7 @@ int main(int argc, char* argv[]) {
     double t = 0.0;
     for (int step = 0; step < num_steps; step++) {
 
-        // ---- Parallel 2D FTCS update (interior points only) ----
+        // Parallel 2D FTCS update (interior points only)
         #pragma omp parallel for collapse(2) schedule(static)
         for (int i = 1; i < NX - 1; i++) {
             for (int j = 1; j < NY - 1; j++) {
@@ -158,7 +145,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        // ---- Dirichlet BCs (edges stay at 0) ----
+        // Dirichlet BCs (edges stay at 0)
         #pragma omp parallel for
         for (int j = 0; j < NY; j++) {
             T_new[idx(0,    j)] = 0.0;
