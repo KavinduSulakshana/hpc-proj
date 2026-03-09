@@ -18,7 +18,7 @@
 #include <iomanip>
 #include <algorithm>
 
-// ============== SIMULATION PARAMETERS ==============
+
 const double LX = 1.0;          // Plate width  (meters)
 const double LY = 1.0;          // Plate height (meters)
 const double ALPHA = 0.01;      // Thermal diffusivity (m²/s)
@@ -190,7 +190,7 @@ int main() {
 
     // Save results
     save_results(T_old, t, "results_2d_seq.csv");
-    std::cout << "\nResults saved to results_2d_seq.csv\n";
+    std::cout << "\nResults saved results_2d_seq.csv\n";
 
     return 0;
 }
