@@ -1,5 +1,13 @@
 /**
  * Sequential Heat Equation Solver
+ * 2D Plate Temperature Evolution Simulation
+ * 
+ * Physics: dT/dt = alpha * (d²T/dx² + d²T/dy²)  (2D Heat Equation)
+ * Method:  FTCS (Forward-Time Central-Space) Finite Difference
+ * 
+ * Boundary: T = 0 on all edges
+ * Initial:  T(x,y,0) = 100 * sin(pi*x) * sin(pi*y)
+ * Analytical: T(x,y,t) = 100 * exp(-2*alpha*pi²*t) * sin(pi*x) * sin(pi*y)
  */
 
 #include <iostream>
@@ -10,7 +18,7 @@
 #include <iomanip>
 #include <algorithm>
 
-// ============== SIMULATION PARAMETERS ==============
+
 const double LX = 1.0;          // Plate width  (meters)
 const double LY = 1.0;          // Plate height (meters)
 const double ALPHA = 0.01;      // Thermal diffusivity (m²/s)
@@ -57,8 +65,7 @@ void initialize(std::vector<double>& T) {
 
 // Analytical solution: T(x,y,t) = 100 * exp(-2*alpha*pi²*t) * sin(pi*x) * sin(pi*y)
 double analytical_solution(double x, double y, double t) {
-    double decay = -ALPHA * PI * PI * (1.0/(LX*LX) + 1.0/(LY*LY));
-    return 100.0 * exp(decay * t) * sin(PI * x / LX) * sin(PI * y / LY);
+    return 100.0 * exp(-2.0 * ALPHA * PI * PI * t) * sin(PI * x) * sin(PI * y);
 }
 
 // Calculate L2 (RMSE) error between numerical and analytical
@@ -76,13 +83,14 @@ double calculate_error(const std::vector<double>& T, double t) {
 }
 
 // Save temperature profile to CSV file (sampled for large grids)
-void save_results(const std::vector<double>& T, double t, const std::string& filename, int stride = 5) {
+void save_results(const std::vector<double>& T, double t, const std::string& filename) {
     std::ofstream file(filename);
     file << "# x, y, T_numerical, T_analytical\n";
-
-    for (int i = 0; i < NX; i += stride) {
+    // Sample every few points to keep file size manageable
+    int step = std::max(1, NX / 100);
+    for (int i = 0; i < NX; i += step) {
         double x = i * DX;
-        for (int j = 0; j < NY; j += stride) {
+        for (int j = 0; j < NY; j += step) {
             double y = j * DY;
             file << x << ", " << y << ", "
                  << T[IDX(i, j)] << ", "
@@ -181,8 +189,8 @@ int main() {
     std::cout << "  Max temperature:  " << std::fixed << max_temp << " °C\n";
 
     // Save results
-    save_results(T_old, t, "Serial/results_2d_seq.csv");
-    std::cout << "\nResults saved to Serial/results_2d_seq.csv\n";
+    save_results(T_old, t, "results_2d_seq.csv");
+    std::cout << "\nResults saved results_2d_seq.csv\n";
 
     return 0;
 }
