@@ -14,7 +14,7 @@
 #include <cmath>
 #include <vector>
 #include <fstream>
-#include <chrono>
+#include <chrono>   
 #include <iomanip>
 #include <algorithm>
 
@@ -97,6 +97,19 @@ void save_results(const std::vector<double>& T, double t, const std::string& fil
                  << analytical_solution(x, y, t) << "\n";
         }
     }
+    file.close();
+}
+
+// Save simulation summary results to CSV
+void save_summary(double final_time, double exec_time, double rmse, double max_temp, const std::string& filename) {
+    std::ofstream file(filename);
+
+    file << "Final_time,Execution_time_ms,RMSE_Error,Max_temperature\n";
+    file << final_time << ","
+         << exec_time << ","
+         << rmse << ","
+         << max_temp << "\n";
+
     file.close();
 }
 
@@ -189,8 +202,14 @@ int main() {
     std::cout << "  Max temperature:  " << std::fixed << max_temp << " °C\n";
 
     // Save results
+    // Save detailed grid results
     save_results(T_old, t, "results_2d_seq.csv");
-    std::cout << "\nResults saved results_2d_seq.csv\n";
 
+    // Save summary results
+    save_summary(t, elapsed.count(), error, max_temp, "summary_2d_seq.csv");
+
+    std::cout << "\nResults saved to:\n";
+    std::cout << "  results_2d_seq.csv (temperature grid)\n";
+    std::cout << "  summary_2d_seq.csv (simulation summary)\n";
     return 0;
 }
