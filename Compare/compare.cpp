@@ -16,9 +16,7 @@
 #include <cstdlib>
 #include <omp.h>
 
-// ============================================================
 //  SIMULATION PARAMETERS
-// ============================================================
 const double LX      = 1.0;
 const double LY      = 1.0;
 const double ALPHA   = 0.01;
@@ -37,9 +35,7 @@ const double PI = 3.14159265358979323846;
 
 inline int IDX(int i, int j) { return i * NY + j; }
 
-// ============================================================
 //  SHARED PHYSICS FUNCTIONS
-// ============================================================
 
 double analytical(double x, double y, double t) {
     double decay = -ALPHA * PI * PI * (1.0/(LX*LX) + 1.0/(LY*LY));
@@ -97,12 +93,12 @@ double max_temp(const std::vector<double>& T) {
     return *std::max_element(T.begin(), T.end());
 }
 
-// ============================================================
-//  RESULT STRUCT
-// ============================================================
+//  RESULT
 struct Result {
-    std::string label;       // e.g. "Serial", "OpenMP-4T"
-    int         threads;
+    std::string label;       // e.g. "Serial", "OpenMP-4T", "Hybrid-4x2T"
+    int         threads;     // total workers used for speedup/efficiency
+    int         mpi_ranks;
+    int         omp_threads;
     double      exec_ms;
     double      rmse;
     double      max_T;
@@ -111,9 +107,7 @@ struct Result {
     double      throughput;  // MPoints/s
 };
 
-// ============================================================
 //  SERIAL SOLVER
-// ============================================================
 Result run_serial() {
     std::vector<double> T_old(NX * NY, 0.0);
     std::vector<double> T_new(NX * NY, 0.0);
@@ -141,12 +135,10 @@ Result run_serial() {
     double mT = max_temp(T_old);
     double tp = ((double)NX * NY * steps) / (ms * 1e3);
 
-    return { "Serial", 1, ms, e, mT, 1.0, 100.0, tp };
+    return { "Serial", 1, 1, 1, ms, e, mT, 1.0, 100.0, tp };
 }
 
-// ============================================================
 //  OpenMP SOLVER
-// ============================================================
 Result run_omp(int num_threads, double serial_ms) {
     omp_set_num_threads(num_threads);
 
@@ -183,17 +175,53 @@ Result run_omp(int num_threads, double serial_ms) {
     double tp  = ((double)NX * NY * steps) / (ms * 1e3);
 
     return { "OpenMP-" + std::to_string(num_threads) + "T",
-             num_threads, ms, e, mT, sp, eff, tp };
+             num_threads, 1, num_threads, ms, e, mT, sp, eff, tp };
 }
 
-// ============================================================
+bool read_hybrid_summary(Result& out, double serial_ms,
+                         const std::string& fname = "Hybrid/summary_2d_hybrid.csv") {
+    std::ifstream f(fname);
+    if (!f) return false;
+
+    std::string header;
+    std::string row;
+    std::getline(f, header);
+    if (!std::getline(f, row)) return false;
+
+    std::replace(row.begin(), row.end(), ',', ' ');
+    std::stringstream ss(row);
+
+    double final_time = 0.0;
+    double exec_ms = 0.0;
+    double rmse = 0.0;
+    double max_T = 0.0;
+    int mpi_ranks = 1;
+    int omp_threads = 1;
+    ss >> final_time >> exec_ms >> rmse >> max_T >> mpi_ranks >> omp_threads;
+
+    if (!ss || exec_ms <= 0.0 || mpi_ranks <= 0 || omp_threads <= 0) {
+        return false;
+    }
+
+    int steps = static_cast<int>(T_FINAL / DT);
+    int workers = mpi_ranks * omp_threads;
+    double speedup = serial_ms / exec_ms;
+    double efficiency = (speedup / workers) * 100.0;
+    double throughput = (static_cast<double>(NX) * NY * steps) / (exec_ms * 1e3);
+
+    out = { "Hybrid-" + std::to_string(mpi_ranks) + "x" +
+            std::to_string(omp_threads) + "T",
+            workers, mpi_ranks, omp_threads, exec_ms, rmse, max_T,
+            speedup, efficiency, throughput };
+    return true;
+}
+
 //  CONSOLE PRINT HELPERS
-// ============================================================
-void sep(char c = '-', int w = 108) { std::cout << std::string(w, c) << "\n"; }
+void sep(char c = '-', int w = 128) { std::cout << std::string(w, c) << "\n"; }
 
 void print_table(const std::vector<Result>& R) {
     sep('=');
-    std::cout << "  2D HEAT EQUATION SOLVER -- SERIAL vs OpenMP COMPARISON\n";
+    std::cout << "  2D HEAT EQUATION SOLVER -- SERIAL vs OpenMP vs HYBRID COMPARISON\n";
     std::cout << "  Grid: " << NX << "x" << NY
               << "  | alpha=" << ALPHA
               << "  | dt=" << std::scientific << std::setprecision(4) << DT
@@ -204,7 +232,9 @@ void print_table(const std::vector<Result>& R) {
     sep('=');
     std::cout << std::left
               << std::setw(16) << "Solver"
-              << std::setw(10) << "Threads"
+              << std::setw(10) << "Workers"
+              << std::setw(10) << "MPI"
+              << std::setw(10) << "OMP"
               << std::setw(14) << "Time (ms)"
               << std::setw(12) << "Speedup"
               << std::setw(14) << "Efficiency%"
@@ -216,6 +246,8 @@ void print_table(const std::vector<Result>& R) {
         std::cout << std::left << std::fixed
                   << std::setw(16) << r.label
                   << std::setw(10) << r.threads
+                  << std::setw(10) << r.mpi_ranks
+                  << std::setw(10) << r.omp_threads
                   << std::setw(14) << std::setprecision(2)  << r.exec_ms
                   << std::setw(12) << std::setprecision(3)  << r.speedup
                   << std::setw(14) << std::setprecision(2)  << r.efficiency
@@ -228,7 +260,7 @@ void print_table(const std::vector<Result>& R) {
 
 void print_accuracy(const std::vector<Result>& R) {
     sep('-', 75);
-    std::cout << "  ACCURACY CHECK -- OpenMP vs Serial RMSE\n";
+    std::cout << "  ACCURACY CHECK -- Parallel solvers vs Serial RMSE\n";
     sep('-', 75);
     std::cout << std::left
               << std::setw(16) << "Solver"
@@ -247,15 +279,15 @@ void print_accuracy(const std::vector<Result>& R) {
     sep('-', 75);
 }
 
-// ============================================================
 //  SAVE CSV
-// ============================================================
 void save_csv(const std::vector<Result>& R, const std::string& fname) {
     std::ofstream f(fname);
-    f << "solver,threads,exec_ms,speedup,efficiency_pct,rmse,max_temp_C,throughput_MPointsPerSec\n";
+    f << "solver,workers,mpi_ranks,openmp_threads,exec_ms,speedup,efficiency_pct,rmse,max_temp_C,throughput_MPointsPerSec\n";
     for (const auto& r : R)
         f << r.label     << ","
           << r.threads   << ","
+          << r.mpi_ranks << ","
+          << r.omp_threads << ","
           << std::fixed       << std::setprecision(4) << r.exec_ms    << ","
           << std::fixed       << std::setprecision(6) << r.speedup    << ","
           << std::fixed       << std::setprecision(4) << r.efficiency << ","
@@ -334,6 +366,7 @@ plt.bar(labels, time_ms)
 plt.title("Execution Time Comparison")
 plt.ylabel("Time (ms)")
 plt.xlabel("Solver")
+plt.xticks(rotation=20, ha='right')
 plt.grid(axis='y')
 plt.tight_layout()
 plt.savefig("Compare/execution_time.png",dpi=200)
@@ -342,14 +375,13 @@ plt.close()
 
     // Speedup Graph
     py << R"PY(
-plt.figure(figsize=(7,5))
-plt.plot(threads, speedup, marker='o', label="Measured")
-plt.plot(threads, threads, '--', label="Ideal")
-plt.title("Speedup vs Threads")
-plt.xlabel("Threads")
+plt.figure(figsize=(8,5))
+plt.bar(labels, speedup)
+plt.title("Speedup Comparison")
+plt.xlabel("Solver")
 plt.ylabel("Speedup")
-plt.legend()
-plt.grid(True)
+plt.xticks(rotation=20, ha='right')
+plt.grid(axis='y')
 plt.tight_layout()
 plt.savefig("Compare/speedup.png",dpi=200)
 plt.close()
@@ -360,7 +392,7 @@ plt.close()
 plt.figure(figsize=(7,5))
 plt.plot(threads, eff, marker='o')
 plt.title("Parallel Efficiency")
-plt.xlabel("Threads")
+plt.xlabel("Total Workers")
 plt.ylabel("Efficiency (%)")
 plt.grid(True)
 plt.tight_layout()
@@ -375,6 +407,7 @@ plt.bar(labels, rmse)
 plt.title("RMSE Accuracy Comparison")
 plt.ylabel("RMSE")
 plt.xlabel("Solver")
+plt.xticks(rotation=20, ha='right')
 plt.grid(axis='y')
 plt.tight_layout()
 plt.savefig("Compare/rmse.png",dpi=200)
@@ -388,6 +421,7 @@ plt.bar(labels, throughput)
 plt.title("Throughput Comparison")
 plt.ylabel("Million Grid Updates / sec")
 plt.xlabel("Solver")
+plt.xticks(rotation=20, ha='right')
 plt.grid(axis='y')
 plt.tight_layout()
 plt.savefig("Compare/throughput.png",dpi=200)
@@ -396,9 +430,12 @@ plt.close()
 
     py.close();
 
-    int ret = std::system("python3 _heat_plots.py");
+    int ret = std::system("python _heat_plots.py");
+    if (ret != 0) {
+        ret = std::system("python3 _heat_plots.py");
+    }
     if(ret!=0)
-        std::cerr<<"WARNING: Graph generation failed. Install Python3 + matplotlib.\n";
+        std::cerr<<"WARNING: Graph generation failed. Install Python + matplotlib.\n";
 
     std::remove("_heat_plots.py");
 
@@ -448,6 +485,20 @@ int main() {
         std::cout << "      Done: " << std::fixed << std::setprecision(2)
                   << r.exec_ms << " ms  |  Speedup: "
                   << std::setprecision(3) << r.speedup << "x\n\n";
+    }
+
+    Result hybrid;
+    std::cout << "  [" << idx++ << "] Loading Hybrid MPI+OpenMP result...\n";
+    if (read_hybrid_summary(hybrid, serial.exec_ms)) {
+        results.push_back(hybrid);
+        std::cout << "      Done: " << std::fixed << std::setprecision(2)
+                  << hybrid.exec_ms << " ms  |  Speedup: "
+                  << std::setprecision(3) << hybrid.speedup << "x"
+                  << "  |  MPI ranks: " << hybrid.mpi_ranks
+                  << "  |  OMP threads/rank: " << hybrid.omp_threads << "\n\n";
+    } else {
+        std::cout << "      Skipped: run Hybrid/heat2d_hybrid first to create "
+                  << "Hybrid/summary_2d_hybrid.csv\n\n";
     }
 
     // Print console table

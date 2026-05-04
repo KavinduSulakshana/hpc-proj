@@ -202,20 +202,22 @@ g++ -fopenmp -o Compare/compare Compare/compare.cpp
 - OpenMP with 2 threads
 - OpenMP with 4 threads
 - OpenMP with max available threads
+- Hybrid MPI + OpenMP result from `Hybrid/summary_2d_hybrid.csv` when available
 
 **Expected output:**
 ```
 ============================================================================================================
-  2D HEAT EQUATION SOLVER -- SERIAL vs OpenMP COMPARISON
+  2D HEAT EQUATION SOLVER -- SERIAL vs OpenMP vs HYBRID COMPARISON
   Grid: 500x500  | alpha=0.01  | dt=2.5000e-05  | T_final=0.5  | Steps=XXXX
   CFL check: rx+ry = 0.4000  (must be <= 0.5)
 ============================================================================================================
-Solver          Threads   Time (ms)     Speedup     Efficiency%   RMSE             MaxTemp(C)    MPoints/s
+Solver          Workers   MPI       OMP       Time (ms)     Speedup     Efficiency%   RMSE             MaxTemp(C)    MPoints/s
 ------------------------------------------------------------------------------------------------------------
-Serial          1         XXXX.XX       1.000       100.00        X.XXXXe-XX       X.XXXX        XXX.XX
-OpenMP-1T       1         XXXX.XX       X.XXX       XX.XX         X.XXXXe-XX       X.XXXX        XXX.XX
-OpenMP-2T       2         XXXX.XX       X.XXX       XX.XX         X.XXXXe-XX       X.XXXX        XXX.XX
-OpenMP-4T       4         XXXX.XX       X.XXX       XX.XX         X.XXXXe-XX       X.XXXX        XXX.XX
+Serial          1         1         1         XXXX.XX       1.000       100.00        X.XXXXe-XX       X.XXXX        XXX.XX
+OpenMP-1T       1         1         1         XXXX.XX       X.XXX       XX.XX         X.XXXXe-XX       X.XXXX        XXX.XX
+OpenMP-2T       2         1         2         XXXX.XX       X.XXX       XX.XX         X.XXXXe-XX       X.XXXX        XXX.XX
+OpenMP-4T       4         1         4         XXXX.XX       X.XXX       XX.XX         X.XXXXe-XX       X.XXXX        XXX.XX
+Hybrid-4x2T     8         4         2         XXXX.XX       X.XXX       XX.XX         X.XXXXe-XX       X.XXXX        XXX.XX
 ============================================================================================================
 
 Graphs saved:
@@ -319,9 +321,72 @@ All OpenMP versions should produce **identical RMSE** to serial — any differen
 ## Upcoming Implementations
 
 - [ ] MPI — Distributed memory solver
-- [ ] Hybrid MPI + OpenMP — Combined parallelism
+- [x] Hybrid MPI + OpenMP — Combined parallelism
 - [ ] CUDA — GPU acceleration
 - [ ] Performance comparison across all implementations
+
+---
+
+## Hybrid MPI + OpenMP Solver
+
+The hybrid implementation is available at:
+
+```bash
+Hybrid/heat2D_hybrid.cpp
+```
+
+It uses:
+- **MPI** to split the 500 x 500 grid into row blocks across processes.
+- **Ghost/halo rows** exchanged between neighboring MPI ranks every time step.
+- **OpenMP** inside each MPI rank to parallelize initialization, stencil updates, RMSE, and max-temperature reduction.
+
+### Compile
+
+```bash
+mpicxx -fopenmp -O2 -o Hybrid/heat2d_hybrid Hybrid/heat2D_hybrid.cpp
+```
+
+On some Windows MPI installations, the compiler wrapper may be named `mpic++` instead:
+
+```bash
+mpic++ -fopenmp -O2 -o Hybrid/heat2d_hybrid Hybrid/heat2D_hybrid.cpp
+```
+
+### Run
+
+Run with 4 MPI ranks and 2 OpenMP threads per rank:
+
+```bash
+mpirun -np 4 ./Hybrid/heat2d_hybrid 2
+```
+
+or:
+
+```bash
+mpiexec -n 4 ./Hybrid/heat2d_hybrid 2
+```
+
+The first argument is the number of OpenMP threads used by each MPI process.
+
+### Output
+
+The root MPI rank writes:
+
+| File | Contents |
+|------|----------|
+| `Hybrid/results_2d_hybrid.csv` | sampled x, y, numerical temperature, analytical temperature |
+| `Hybrid/summary_2d_hybrid.csv` | final time, execution time, RMSE, max temperature, rank/thread count |
+
+### Add Hybrid Result to Comparison
+
+Run the hybrid solver first so `Hybrid/summary_2d_hybrid.csv` exists, then run the comparison benchmark:
+
+```bash
+g++ -fopenmp -o Compare/compare Compare/compare.cpp
+./Compare/compare
+```
+
+`Compare/compare` automatically loads the latest hybrid summary and adds it to the console table, `Compare/comparison_results.csv`, and the generated comparison graphs.
 
 ## License
 
