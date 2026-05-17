@@ -14,26 +14,36 @@
 #include <string>
 #include <sstream>
 #include <cstdlib>
+#include <limits>
 #include <omp.h>
 
 //  SIMULATION PARAMETERS
 const double LX      = 1.0;
 const double LY      = 1.0;
 const double ALPHA   = 0.01;
-const int    NX      = 500;
-const int    NY      = 500;
+int          NX      = 500;
+int          NY      = 500;
 const double T_FINAL = 0.5;
 
-const double DX = LX / (NX - 1);
-const double DY = LY / (NY - 1);
-
-const double DT = 0.4 * 0.5 * (DX*DX * DY*DY) / (ALPHA * (DX*DX + DY*DY));
-
-const double RX = ALPHA * DT / (DX * DX);
-const double RY = ALPHA * DT / (DY * DY);
+double DX = 0.0;
+double DY = 0.0;
+double DT = 0.0;
+double RX = 0.0;
+double RY = 0.0;
 const double PI = 3.14159265358979323846;
 
 inline int IDX(int i, int j) { return i * NY + j; }
+std::vector<double> serial_baseline;
+
+void configure_grid(int nx, int ny) {
+    NX = std::max(3, nx);
+    NY = std::max(3, ny);
+    DX = LX / (NX - 1);
+    DY = LY / (NY - 1);
+    DT = 0.4 * 0.5 * (DX*DX * DY*DY) / (ALPHA * (DX*DX + DY*DY));
+    RX = ALPHA * DT / (DX * DX);
+    RY = ALPHA * DT / (DY * DY);
+}
 
 //  SHARED PHYSICS FUNCTIONS
 
@@ -93,6 +103,19 @@ double max_temp(const std::vector<double>& T) {
     return *std::max_element(T.begin(), T.end());
 }
 
+double rmse_vs_reference(const std::vector<double>& T,
+                         const std::vector<double>& ref) {
+    if (T.size() != ref.size() || T.empty()) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    double err = 0.0;
+    for (size_t k = 0; k < T.size(); k++) {
+        double diff = T[k] - ref[k];
+        err += diff * diff;
+    }
+    return std::sqrt(err / T.size());
+}
+
 //  RESULT
 struct Result {
     std::string label;       // e.g. "Serial", "OpenMP-4T", "Hybrid-4x2T"
@@ -101,6 +124,7 @@ struct Result {
     int         omp_threads;
     double      exec_ms;
     double      rmse;
+    double      rmse_vs_serial;
     double      max_T;
     double      speedup;
     double      efficiency;  // percent
@@ -132,10 +156,11 @@ Result run_serial() {
     double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
 
     double e  = rmse_seq(T_old, t);
+    serial_baseline = T_old;
     double mT = max_temp(T_old);
     double tp = ((double)NX * NY * steps) / (ms * 1e3);
 
-    return { "Serial", 1, 1, 1, ms, e, mT, 1.0, 100.0, tp };
+    return { "Serial", 1, 1, 1, ms, e, 0.0, mT, 1.0, 100.0, tp };
 }
 
 //  OpenMP SOLVER
@@ -169,13 +194,14 @@ Result run_omp(int num_threads, double serial_ms) {
     double ms  = std::chrono::duration<double, std::milli>(t1 - t0).count();
 
     double e   = rmse_omp(T_old, t);
+    double es  = rmse_vs_reference(T_old, serial_baseline);
     double mT  = max_temp(T_old);
     double sp  = serial_ms / ms;
     double eff = (sp / num_threads) * 100.0;
     double tp  = ((double)NX * NY * steps) / (ms * 1e3);
 
     return { "OpenMP-" + std::to_string(num_threads) + "T",
-             num_threads, 1, num_threads, ms, e, mT, sp, eff, tp };
+             num_threads, 1, num_threads, ms, e, es, mT, sp, eff, tp };
 }
 
 bool read_hybrid_summary(Result& out, double serial_ms,
@@ -197,9 +223,13 @@ bool read_hybrid_summary(Result& out, double serial_ms,
     double max_T = 0.0;
     int mpi_ranks = 1;
     int omp_threads = 1;
+    int file_nx = NX;
+    int file_ny = NY;
     ss >> final_time >> exec_ms >> rmse >> max_T >> mpi_ranks >> omp_threads;
+    ss >> file_nx >> file_ny;
 
-    if (!ss || exec_ms <= 0.0 || mpi_ranks <= 0 || omp_threads <= 0) {
+    if (exec_ms <= 0.0 || mpi_ranks <= 0 || omp_threads <= 0 ||
+        file_nx != NX || file_ny != NY) {
         return false;
     }
 
@@ -211,8 +241,84 @@ bool read_hybrid_summary(Result& out, double serial_ms,
 
     out = { "Hybrid-" + std::to_string(mpi_ranks) + "x" +
             std::to_string(omp_threads) + "T",
-            workers, mpi_ranks, omp_threads, exec_ms, rmse, max_T,
+            workers, mpi_ranks, omp_threads, exec_ms, rmse,
+            std::numeric_limits<double>::quiet_NaN(), max_T,
             speedup, efficiency, throughput };
+    return true;
+}
+
+bool read_mpi_summary(Result& out, double serial_ms,
+                      const std::string& fname = "MPI/summary_2d_mpi.csv") {
+    std::ifstream f(fname);
+    if (!f) return false;
+
+    std::string header;
+    std::string row;
+    std::getline(f, header);
+    if (!std::getline(f, row)) return false;
+
+    std::replace(row.begin(), row.end(), ',', ' ');
+    std::stringstream ss(row);
+
+    double final_time = 0.0;
+    double exec_ms = 0.0;
+    double rmse = 0.0;
+    double max_T = 0.0;
+    int mpi_ranks = 1;
+    int file_nx = NX;
+    int file_ny = NY;
+    ss >> final_time >> exec_ms >> rmse >> max_T >> mpi_ranks;
+    ss >> file_nx >> file_ny;
+
+    if (exec_ms <= 0.0 || mpi_ranks <= 0 || file_nx != NX || file_ny != NY) {
+        return false;
+    }
+
+    int steps = static_cast<int>(T_FINAL / DT);
+    double speedup = serial_ms / exec_ms;
+    double efficiency = (speedup / mpi_ranks) * 100.0;
+    double throughput = (static_cast<double>(NX) * NY * steps) / (exec_ms * 1e3);
+
+    out = { "MPI-" + std::to_string(mpi_ranks) + "R",
+            mpi_ranks, mpi_ranks, 0, exec_ms, rmse,
+            std::numeric_limits<double>::quiet_NaN(), max_T,
+            speedup, efficiency, throughput };
+    return true;
+}
+
+bool read_cuda_summary(Result& out, double serial_ms,
+                       const std::string& fname = "cuda/summary_2d_cuda.csv") {
+    std::ifstream f(fname);
+    if (!f) return false;
+
+    std::string header;
+    std::string row;
+    std::getline(f, header);
+    if (!std::getline(f, row)) return false;
+
+    std::replace(row.begin(), row.end(), ',', ' ');
+    std::stringstream ss(row);
+
+    double final_time = 0.0;
+    double exec_ms = 0.0;
+    double rmse = 0.0;
+    double max_T = 0.0;
+    int file_nx = NX;
+    int file_ny = NY;
+    ss >> final_time >> exec_ms >> rmse >> max_T;
+    ss >> file_nx >> file_ny;
+
+    if (exec_ms <= 0.0 || file_nx != NX || file_ny != NY) {
+        return false;
+    }
+
+    int steps = static_cast<int>(T_FINAL / DT);
+    double speedup = serial_ms / exec_ms;
+    double throughput = (static_cast<double>(NX) * NY * steps) / (exec_ms * 1e3);
+
+    out = { "CUDA", 0, 0, 0, exec_ms, rmse,
+            std::numeric_limits<double>::quiet_NaN(), max_T,
+            speedup, 0.0, throughput };
     return true;
 }
 
@@ -221,7 +327,7 @@ void sep(char c = '-', int w = 128) { std::cout << std::string(w, c) << "\n"; }
 
 void print_table(const std::vector<Result>& R) {
     sep('=');
-    std::cout << "  2D HEAT EQUATION SOLVER -- SERIAL vs OpenMP vs HYBRID COMPARISON\n";
+    std::cout << "  2D HEAT EQUATION SOLVER -- SERIAL vs OpenMP vs MPI vs HYBRID vs CUDA\n";
     std::cout << "  Grid: " << NX << "x" << NY
               << "  | alpha=" << ALPHA
               << "  | dt=" << std::scientific << std::setprecision(4) << DT
@@ -239,6 +345,7 @@ void print_table(const std::vector<Result>& R) {
               << std::setw(12) << "Speedup"
               << std::setw(14) << "Efficiency%"
               << std::setw(16) << "RMSE"
+              << std::setw(16) << "RMSEvsSerial"
               << std::setw(14) << "MaxTemp(C)"
               << std::setw(12) << "MPoints/s" << "\n";
     sep();
@@ -252,6 +359,7 @@ void print_table(const std::vector<Result>& R) {
                   << std::setw(12) << std::setprecision(3)  << r.speedup
                   << std::setw(14) << std::setprecision(2)  << r.efficiency
                   << std::setw(16) << std::scientific << std::setprecision(4) << r.rmse
+                  << std::setw(16) << std::scientific << std::setprecision(4) << r.rmse_vs_serial
                   << std::setw(14) << std::fixed << std::setprecision(4) << r.max_T
                   << std::setw(12) << std::fixed << std::setprecision(2) << r.throughput
                   << "\n";
@@ -260,21 +368,25 @@ void print_table(const std::vector<Result>& R) {
 
 void print_accuracy(const std::vector<Result>& R) {
     sep('-', 75);
-    std::cout << "  ACCURACY CHECK -- Parallel solvers vs Serial RMSE\n";
+    std::cout << "  ACCURACY CHECK -- RMSE vs Serial Baseline\n";
     sep('-', 75);
     std::cout << std::left
               << std::setw(16) << "Solver"
-              << std::setw(22) << "RMSE"
-              << std::setw(22) << "Diff from Serial"
+              << std::setw(22) << "Analytical RMSE"
+              << std::setw(22) << "RMSE vs Serial"
               << "Match?\n";
     sep('-', 75);
     for (const auto& r : R) {
-        double d = std::abs(r.rmse - R[0].rmse);
+        bool has_serial_rmse = !std::isnan(r.rmse_vs_serial);
         std::cout << std::left
                   << std::setw(16) << r.label
                   << std::setw(22) << std::scientific << std::setprecision(4) << r.rmse
-                  << std::setw(22) << std::scientific << std::setprecision(2) << d
-                  << (d < 1e-10 ? "YES (identical)" : "YES (fp rounding only)") << "\n";
+                  << std::setw(22) << std::scientific << std::setprecision(4)
+                  << r.rmse_vs_serial
+                  << (has_serial_rmse
+                          ? (r.rmse_vs_serial < 1e-10 ? "YES" : "CHECK")
+                          : "N/A (loaded summary only)")
+                  << "\n";
     }
     sep('-', 75);
 }
@@ -282,7 +394,7 @@ void print_accuracy(const std::vector<Result>& R) {
 //  SAVE CSV
 void save_csv(const std::vector<Result>& R, const std::string& fname) {
     std::ofstream f(fname);
-    f << "solver,workers,mpi_ranks,openmp_threads,exec_ms,speedup,efficiency_pct,rmse,max_temp_C,throughput_MPointsPerSec\n";
+    f << "solver,workers,mpi_ranks,openmp_threads,exec_ms,speedup,efficiency_pct,rmse,rmse_vs_serial,max_temp_C,throughput_MPointsPerSec\n";
     for (const auto& r : R)
         f << r.label     << ","
           << r.threads   << ","
@@ -292,6 +404,7 @@ void save_csv(const std::vector<Result>& R, const std::string& fname) {
           << std::fixed       << std::setprecision(6) << r.speedup    << ","
           << std::fixed       << std::setprecision(4) << r.efficiency << ","
           << std::scientific  << std::setprecision(6) << r.rmse       << ","
+          << std::scientific  << std::setprecision(6) << r.rmse_vs_serial << ","
           << std::fixed       << std::setprecision(6) << r.max_T      << ","
           << std::fixed       << std::setprecision(4) << r.throughput << "\n";
     f.close();
@@ -447,7 +560,13 @@ plt.close()
     std::cout << "  throughput.png\n";
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+    int requested_nx = 500;
+    int requested_ny = 500;
+    if (argc > 1) requested_nx = std::atoi(argv[1]);
+    if (argc > 2) requested_ny = std::atoi(argv[2]);
+    configure_grid(requested_nx, requested_ny);
+
     if ((RX + RY) > 0.5) {
         std::cerr << "ERROR: Unstable! rx+ry = " << (RX+RY) << " > 0.5\n";
         return 1;
@@ -487,6 +606,19 @@ int main() {
                   << std::setprecision(3) << r.speedup << "x\n\n";
     }
 
+    Result mpi;
+    std::cout << "  [" << idx++ << "] Loading MPI result...\n";
+    if (read_mpi_summary(mpi, serial.exec_ms)) {
+        results.push_back(mpi);
+        std::cout << "      Done: " << std::fixed << std::setprecision(2)
+                  << mpi.exec_ms << " ms  |  Speedup: "
+                  << std::setprecision(3) << mpi.speedup << "x"
+                  << "  |  MPI ranks: " << mpi.mpi_ranks << "\n\n";
+    } else {
+        std::cout << "      Skipped: run MPI/heat2d_mpi first to create "
+                  << "MPI/summary_2d_mpi.csv\n\n";
+    }
+
     Result hybrid;
     std::cout << "  [" << idx++ << "] Loading Hybrid MPI+OpenMP result...\n";
     if (read_hybrid_summary(hybrid, serial.exec_ms)) {
@@ -499,6 +631,18 @@ int main() {
     } else {
         std::cout << "      Skipped: run Hybrid/heat2d_hybrid first to create "
                   << "Hybrid/summary_2d_hybrid.csv\n\n";
+    }
+
+    Result cuda;
+    std::cout << "  [" << idx++ << "] Loading CUDA result...\n";
+    if (read_cuda_summary(cuda, serial.exec_ms)) {
+        results.push_back(cuda);
+        std::cout << "      Done: " << std::fixed << std::setprecision(2)
+                  << cuda.exec_ms << " ms  |  Speedup: "
+                  << std::setprecision(3) << cuda.speedup << "x\n\n";
+    } else {
+        std::cout << "      Skipped: run cuda/heat2d_cuda first to create "
+                  << "cuda/summary_2d_cuda.csv\n\n";
     }
 
     // Print console table

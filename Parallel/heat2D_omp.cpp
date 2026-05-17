@@ -177,8 +177,8 @@ int main(int argc, char* argv[]) {
     std::cout << "  Max temperature:  " << std::fixed << max_T << " °C\n";
     std::cout << "  Threads used:     " << num_threads << "\n";
 
-    save_results(T_old, t, "hpc-proj/Parallel/results_2d_omp.csv");
-    std::cout << "\nResults saved to results_2d_omp.csv\n";
+    save_results(T_old, t, "Parallel/results_2d_omp.csv");
+    std::cout << "\nResults saved to Parallel/results_2d_omp.csv\n";
     std::cout << "(Coarsened by stride=5 to keep file size manageable)\n";
 
     return 0;

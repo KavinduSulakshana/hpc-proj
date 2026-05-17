@@ -203,13 +203,13 @@ int main() {
 
     // Save results
     // Save detailed grid results
-    save_results(T_old, t, "results_2d_seq.csv");
+    save_results(T_old, t, "Serial/results_2d_seq.csv");
 
     // Save summary results
-    save_summary(t, elapsed.count(), error, max_temp, "summary_2d_seq.csv");
+    save_summary(t, elapsed.count(), error, max_temp, "Serial/summary_2d_seq.csv");
 
     std::cout << "\nResults saved to:\n";
-    std::cout << "  results_2d_seq.csv (temperature grid)\n";
-    std::cout << "  summary_2d_seq.csv (simulation summary)\n";
+    std::cout << "  Serial/results_2d_seq.csv (temperature grid)\n";
+    std::cout << "  Serial/summary_2d_seq.csv (simulation summary)\n";
     return 0;
 }
