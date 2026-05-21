@@ -62,7 +62,7 @@ SimParams make_params() {
     return p;
 }
 
-// ============== CUDA ERROR CHECKING ==============
+// CUDA ERROR CHECKING
 #define CUDA_CHECK(call) \
     do { \
         cudaError_t err = call; \
@@ -73,7 +73,7 @@ SimParams make_params() {
         } \
     } while(0)
 
-// ============== CUDA KERNELS ==============
+// CUDA Kernals
 
 /**
  * Initialization kernel
@@ -129,7 +129,7 @@ __global__ void heat_step_kernel(const double* __restrict__ T_old,
         + ry * (T_old[index2d(i, j+1, ny)] - 2.0 * T_old[index2d(i, j, ny)] + T_old[index2d(i, j-1, ny)]);
 }
 
-// ============== HOST FUNCTIONS ==============
+// HOST Functions 
 
 double analytical_solution(double x, double y, double t) {
     return 100.0 * exp(-2.0 * ALPHA * PI * PI * t) * sin(PI * x) * sin(PI * y);
