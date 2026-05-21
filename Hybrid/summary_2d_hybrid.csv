@@ -1,2 +1,2 @@
 Final_time,Execution_time_ms,RMSE_Error,Max_temperature,MPI_ranks,OpenMP_threads,NX,NY
-0.499998,3574.85,2.94769e-06,90.6009,4,2,500,500
+0.499998,2654.1,2.94769e-06,90.6009,4,2,500,500
