@@ -116,6 +116,53 @@ double rmse_vs_reference(const std::vector<double>& T,
     return std::sqrt(err / T.size());
 }
 
+double file_rmse_vs_serial(const std::string& fname) {
+    if (serial_baseline.empty()) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+
+    std::ifstream f(fname);
+    if (!f) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+
+    std::string line;
+    double err = 0.0;
+    size_t count = 0;
+
+    while (std::getline(f, line)) {
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+
+        std::replace(line.begin(), line.end(), ',', ' ');
+        std::stringstream ss(line);
+
+        double x = 0.0;
+        double y = 0.0;
+        double numerical = 0.0;
+        double analytical_value = 0.0;
+        if (!(ss >> x >> y >> numerical >> analytical_value)) {
+            continue;
+        }
+
+        int i = static_cast<int>(std::llround(x / DX));
+        int j = static_cast<int>(std::llround(y / DY));
+        if (i < 0 || i >= NX || j < 0 || j >= NY) {
+            continue;
+        }
+
+        double diff = numerical - serial_baseline[IDX(i, j)];
+        err += diff * diff;
+        count++;
+    }
+
+    if (count == 0) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    return std::sqrt(err / count);
+}
+
 //  RESULT
 struct Result {
     std::string label;       // e.g. "Serial", "OpenMP-4T", "Hybrid-4x2T"
@@ -205,7 +252,8 @@ Result run_omp(int num_threads, double serial_ms) {
 }
 
 bool read_hybrid_summary(Result& out, double serial_ms,
-                         const std::string& fname = "Hybrid/summary_2d_hybrid.csv") {
+                         const std::string& fname = "Hybrid/summary_2d_hybrid.csv",
+                         const std::string& result_fname = "Hybrid/results_2d_hybrid.csv") {
     std::ifstream f(fname);
     if (!f) return false;
 
@@ -242,13 +290,14 @@ bool read_hybrid_summary(Result& out, double serial_ms,
     out = { "Hybrid-" + std::to_string(mpi_ranks) + "x" +
             std::to_string(omp_threads) + "T",
             workers, mpi_ranks, omp_threads, exec_ms, rmse,
-            std::numeric_limits<double>::quiet_NaN(), max_T,
+            file_rmse_vs_serial(result_fname), max_T,
             speedup, efficiency, throughput };
     return true;
 }
 
 bool read_mpi_summary(Result& out, double serial_ms,
-                      const std::string& fname = "MPI/summary_2d_mpi.csv") {
+                      const std::string& fname = "MPI/summary_2d_mpi.csv",
+                      const std::string& result_fname = "MPI/results_2d_mpi.csv") {
     std::ifstream f(fname);
     if (!f) return false;
 
@@ -281,13 +330,14 @@ bool read_mpi_summary(Result& out, double serial_ms,
 
     out = { "MPI-" + std::to_string(mpi_ranks) + "R",
             mpi_ranks, mpi_ranks, 0, exec_ms, rmse,
-            std::numeric_limits<double>::quiet_NaN(), max_T,
+            file_rmse_vs_serial(result_fname), max_T,
             speedup, efficiency, throughput };
     return true;
 }
 
 bool read_cuda_summary(Result& out, double serial_ms,
-                       const std::string& fname = "cuda/summary_2d_cuda.csv") {
+                       const std::string& fname = "cuda/summary_2d_cuda.csv",
+                       const std::string& result_fname = "cuda/results_2d_cuda.csv") {
     std::ifstream f(fname);
     if (!f) return false;
 
@@ -317,7 +367,7 @@ bool read_cuda_summary(Result& out, double serial_ms,
     double throughput = (static_cast<double>(NX) * NY * steps) / (exec_ms * 1e3);
 
     out = { "CUDA", 0, 0, 0, exec_ms, rmse,
-            std::numeric_limits<double>::quiet_NaN(), max_T,
+            file_rmse_vs_serial(result_fname), max_T,
             speedup, 0.0, throughput };
     return true;
 }
@@ -385,7 +435,7 @@ void print_accuracy(const std::vector<Result>& R) {
                   << r.rmse_vs_serial
                   << (has_serial_rmse
                           ? (r.rmse_vs_serial < 1e-10 ? "YES" : "CHECK")
-                          : "N/A (loaded summary only)")
+                          : "N/A (results CSV missing)")
                   << "\n";
     }
     sep('-', 75);

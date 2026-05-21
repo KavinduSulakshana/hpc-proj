@@ -78,7 +78,7 @@ double calculate_error(const std::vector<double>& T, double t) {
 }
 
 void save_results(const std::vector<double>& T, double t,
-                  const std::string& filename, int stride = 5) {
+                  const std::string& filename, int stride = 1) {
     std::ofstream file(filename);
     file << "# x, y, T_numerical, T_analytical\n";
     file << std::fixed << std::setprecision(6);
@@ -179,7 +179,7 @@ int main(int argc, char* argv[]) {
 
     save_results(T_old, t, "Parallel/results_2d_omp.csv");
     std::cout << "\nResults saved to Parallel/results_2d_omp.csv\n";
-    std::cout << "(Coarsened by stride=5 to keep file size manageable)\n";
+    std::cout << "(Full grid output)\n";
 
     return 0;
 }

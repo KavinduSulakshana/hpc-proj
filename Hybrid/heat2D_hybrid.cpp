@@ -171,10 +171,9 @@ void save_results(const std::vector<double>& T, double t, const std::string& fil
     file << "# x, y, T_numerical, T_analytical\n";
     file << std::fixed << std::setprecision(6);
 
-    int stride = std::max(1, NX / 100);
-    for (int i = 0; i < NX; i += stride) {
+    for (int i = 0; i < NX; i++) {
         double x = i * DX;
-        for (int j = 0; j < NY; j += stride) {
+        for (int j = 0; j < NY; j++) {
             double y = j * DY;
             file << x << ", " << y << ", "
                  << T[gidx(i, j)] << ", "

@@ -82,15 +82,14 @@ double calculate_error(const std::vector<double>& T, double t) {
     return sqrt(error / (NX * NY));
 }
 
-// Save temperature profile to CSV file (sampled for large grids)
+// Save full temperature profile to CSV file
 void save_results(const std::vector<double>& T, double t, const std::string& filename) {
     std::ofstream file(filename);
     file << "# x, y, T_numerical, T_analytical\n";
-    // Sample every few points to keep file size manageable
-    int step = std::max(1, NX / 100);
-    for (int i = 0; i < NX; i += step) {
+
+    for (int i = 0; i < NX; i++) {
         double x = i * DX;
-        for (int j = 0; j < NY; j += step) {
+        for (int j = 0; j < NY; j++) {
             double y = j * DY;
             file << x << ", " << y << ", "
                  << T[IDX(i, j)] << ", "
