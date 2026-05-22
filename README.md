@@ -40,7 +40,7 @@ hpc-proj/
   Parallel/heat2D_omp.cpp        OpenMP solver
   MPI/heat2D_mpi.cpp             Pure MPI solver
   Hybrid/heat2D_hybrid.cpp       MPI + OpenMP solver
-  cuda/heat2D_serail.cu          CUDA solver
+  cuda/heat2D_cuda.cu            CUDA solver
   Compare/compare.cpp            Benchmark and graph generator
 ```
 
@@ -77,7 +77,7 @@ mpirun -np 4 ./Hybrid/heat2d_hybrid 2 500 500
 CUDA:
 
 ```bash
-nvcc -O2 -o cuda/heat2d_cuda cuda/heat2D_serail.cu
+nvcc -O2 -o cuda/heat2d_cuda cuda/heat2D_cuda.cu
 ./cuda/heat2d_cuda 500 500
 ```
 
@@ -117,4 +117,4 @@ Summary files include grid dimensions, so mismatched summaries are skipped when 
 
 ## Notes
 
-The CUDA source filename currently keeps the original project spelling, `heat2D_serail.cu`, but the recommended compiled executable name is `cuda/heat2d_cuda`.
+The recommended CUDA executable name is `cuda/heat2d_cuda`.
