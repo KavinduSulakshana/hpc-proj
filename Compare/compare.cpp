@@ -287,7 +287,7 @@ bool read_mpi_summary(Result& out, double serial_ms,
 }
 
 bool read_cuda_summary(Result& out, double serial_ms,
-                       const std::string& fname = "cuda/summary_2d_cuda.csv") {
+                       const std::string& fname = "cuda/results_2d_cuda.csv") {
     std::ifstream f(fname);
     if (!f) return false;
 
