@@ -552,12 +552,16 @@ plt.close()
 
     // Efficiency Graph
     py << R"PY(
-plt.figure(figsize=(7,5))
-plt.plot(threads, eff, marker='o')
-plt.title("Parallel Efficiency")
-plt.xlabel("Total Workers")
-plt.ylabel("Efficiency (%)")
-plt.grid(True)
+plt.figure(figsize=(8,5))
+plt.bar(labels, eff)
+plt.title("Parallel Efficiency by Solver")
+plt.xlabel("Solver")
+plt.ylabel("Efficiency (%) = Speedup / Workers x 100")
+plt.xticks(rotation=20, ha='right')
+plt.grid(axis='y')
+for i, (label, value) in enumerate(zip(labels, eff)):
+    text = "N/A" if label == "CUDA" else f"{value:.1f}%"
+    plt.text(i, value, text, ha='center', va='bottom', fontsize=8)
 plt.tight_layout()
 plt.savefig("Compare/efficiency.png",dpi=200)
 plt.close()
