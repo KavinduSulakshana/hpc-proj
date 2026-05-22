@@ -279,8 +279,8 @@ int main(int argc, char* argv[]) {
     std::cout << "  RMSE Error:       " << std::scientific << error << "\n";
     std::cout << "  Max temperature:  " << std::fixed << max_temp << " C\n";
 
-    save_results(h_T, t, NX, NY, p, "cuda/results_2d_cuda.csv");
-    save_summary(t, elapsed_ms, error, max_temp, "cuda/summary_2d_cuda.csv");
+    save_results(h_T, t, NX, NY, p, "results_2d_cuda.csv");
+    save_summary(t, elapsed_ms, error, max_temp, "summary_2d_cuda.csv");
     std::cout << "\nResults saved to:\n";
     std::cout << "  cuda/results_2d_cuda.csv\n";
     std::cout << "  cuda/summary_2d_cuda.csv\n";
