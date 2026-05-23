@@ -513,7 +513,6 @@ void save_frontend_data(const std::vector<Result>& R, const std::string& fname) 
     f.close();
     std::cout << "  JS   saved: " << fname << "\n";
 }
-
 // ============================================================
 //  GENERATE SEPARATE USER-FRIENDLY GRAPHS
 // ============================================================
@@ -525,6 +524,22 @@ void generate_graphs(const std::vector<Result>& R)
     py << "import matplotlib\n";
     py << "matplotlib.use('Agg')\n";
     py << "import matplotlib.pyplot as plt\n\n";
+    py << R"PY(
+def add_bar_labels(bars, values, formatter):
+    max_value = max(values) if values else 0
+    offset = max_value * 0.015 if max_value > 0 else 0.01
+    for bar, value in zip(bars, values):
+        plt.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + offset,
+            formatter(value),
+            ha='center',
+            va='bottom',
+            fontsize=8,
+            rotation=0
+        )
+
+)PY";
 
     py << "labels = [";
     for(size_t i=0;i<R.size();i++){
@@ -578,12 +593,13 @@ void generate_graphs(const std::vector<Result>& R)
     // Execution Time Graph
     py << R"PY(
 plt.figure(figsize=(7,5))
-plt.bar(labels, time_ms)
+bars = plt.bar(labels, time_ms)
 plt.title("Execution Time Comparison")
 plt.ylabel("Time (ms)")
 plt.xlabel("Solver")
 plt.xticks(rotation=20, ha='right')
 plt.grid(axis='y')
+add_bar_labels(bars, time_ms, lambda v: f"{v:.0f} ms")
 plt.tight_layout()
 plt.savefig("Compare/execution_time.png",dpi=200)
 plt.close()
@@ -592,12 +608,13 @@ plt.close()
     // Speedup Graph
     py << R"PY(
 plt.figure(figsize=(8,5))
-plt.bar(labels, speedup)
+bars = plt.bar(labels, speedup)
 plt.title("Speedup Comparison")
 plt.xlabel("Solver")
 plt.ylabel("Speedup")
 plt.xticks(rotation=20, ha='right')
 plt.grid(axis='y')
+add_bar_labels(bars, speedup, lambda v: f"{v:.2f}x")
 plt.tight_layout()
 plt.savefig("Compare/speedup.png",dpi=200)
 plt.close()
@@ -606,15 +623,13 @@ plt.close()
     // Efficiency Graph
     py << R"PY(
 plt.figure(figsize=(8,5))
-plt.bar(labels, eff)
+bars = plt.bar(labels, eff)
 plt.title("Parallel Efficiency by Solver")
 plt.xlabel("Solver")
 plt.ylabel("Efficiency (%) = Speedup / Workers x 100")
 plt.xticks(rotation=20, ha='right')
 plt.grid(axis='y')
-for i, (label, value) in enumerate(zip(labels, eff)):
-    text = "N/A" if label == "CUDA" else f"{value:.1f}%"
-    plt.text(i, value, text, ha='center', va='bottom', fontsize=8)
+add_bar_labels(bars, eff, lambda v: f"{v:.1f}%")
 plt.tight_layout()
 plt.savefig("Compare/efficiency.png",dpi=200)
 plt.close()
@@ -623,12 +638,13 @@ plt.close()
     // RMSE Graph
     py << R"PY(
 plt.figure(figsize=(7,5))
-plt.bar(labels, rmse)
+bars = plt.bar(labels, rmse)
 plt.title("RMSE Accuracy Comparison")
 plt.ylabel("RMSE")
 plt.xlabel("Solver")
 plt.xticks(rotation=20, ha='right')
 plt.grid(axis='y')
+add_bar_labels(bars, rmse, lambda v: f"{v:.2e}")
 plt.tight_layout()
 plt.savefig("Compare/rmse.png",dpi=200)
 plt.close()
@@ -637,12 +653,13 @@ plt.close()
     // Throughput Graph
     py << R"PY(
 plt.figure(figsize=(7,5))
-plt.bar(labels, throughput)
+bars = plt.bar(labels, throughput)
 plt.title("Throughput Comparison")
 plt.ylabel("Million Grid Updates / sec")
 plt.xlabel("Solver")
 plt.xticks(rotation=20, ha='right')
 plt.grid(axis='y')
+add_bar_labels(bars, throughput, lambda v: f"{v:.0f}")
 plt.tight_layout()
 plt.savefig("Compare/throughput.png",dpi=200)
 plt.close()
