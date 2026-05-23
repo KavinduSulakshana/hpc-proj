@@ -513,7 +513,6 @@ void save_frontend_data(const std::vector<Result>& R, const std::string& fname) 
     f.close();
     std::cout << "  JS   saved: " << fname << "\n";
 }
-
 // ============================================================
 //  GENERATE SEPARATE USER-FRIENDLY GRAPHS
 // ============================================================
