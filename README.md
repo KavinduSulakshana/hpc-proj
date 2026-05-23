@@ -76,9 +76,12 @@ mpirun -np 4 ./Hybrid/heat2d_hybrid 2 500 500
 
 CUDA:
 
+using the x64 Native tools command prompt
+change directory to project folder /cuda
+
 ```bash
-nvcc -O2 -o cuda/heat2d_cuda cuda/heat2D_cuda.cu
-./cuda/heat2d_cuda 500 500
+nvcc -O2 heat2D_cuda.cu -o heat2d_cuda
+heat2d_cuda.exe
 ```
 
 Comparison:
