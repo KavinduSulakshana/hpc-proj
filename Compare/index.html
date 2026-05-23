@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>2D Heat Solver Comparison</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17212b;
+      --muted: #64717f;
+      --line: #dbe3ea;
+      --panel: #ffffff;
+      --soft: #f5f8fb;
+      --accent: #0f766e;
+      --accent-2: #b45309;
+      --good: #157347;
+      --warn: #ad5f00;
+      --shadow: 0 18px 45px rgba(21, 32, 43, 0.09);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      background:
+        linear-gradient(180deg, #eef6f5 0, #f7f9fb 320px, #ffffff 100%);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    header {
+      border-bottom: 1px solid rgba(23, 33, 43, 0.08);
+      background: rgba(255, 255, 255, 0.78);
+      backdrop-filter: blur(14px);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+
+    .nav {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      min-height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .mark {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: white;
+      background: linear-gradient(135deg, #0f766e, #2563eb);
+      font-size: 18px;
+      font-weight: 900;
+    }
+
+    .nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-weight: 650;
+      font-size: 14px;
+    }
+
+    main {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 38px 0 56px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(310px, 0.85fr);
+      gap: 28px;
+      align-items: end;
+      margin-bottom: 30px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      max-width: 760px;
+      font-size: clamp(34px, 5vw, 62px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      margin: 0;
+      max-width: 780px;
+      color: var(--muted);
+      font-size: clamp(16px, 2vw, 19px);
+    }
+
+    .run-note {
+      align-self: stretch;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.84);
+      box-shadow: var(--shadow);
+    }
+
+    .run-note span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 750;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .run-note strong {
+      display: block;
+      margin-top: 7px;
+      font-size: 26px;
+      line-height: 1.1;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+
+    .metric {
+      min-height: 132px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 10px 28px rgba(21, 32, 43, 0.06);
+    }
+
+    .metric .label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 750;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .metric .value {
+      margin: 12px 0 4px;
+      font-size: clamp(24px, 3.2vw, 38px);
+      line-height: 1;
+      font-weight: 850;
+    }
+
+    .metric .sub {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .badge {
+      display: inline-grid;
+      place-items: center;
+      min-width: 34px;
+      height: 26px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: #e8f5f3;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 18px;
+      margin: 34px 0 14px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 23px;
+      letter-spacing: 0;
+    }
+
+    .section-title p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .leaderboard {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .rank-list {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .rank-list h3 {
+      margin: 0 0 14px;
+      font-size: 17px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 108px minmax(110px, 1fr) 88px;
+      gap: 12px;
+      align-items: center;
+      min-height: 38px;
+      font-size: 14px;
+    }
+
+    .bar-name {
+      font-weight: 760;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .bar-track {
+      height: 10px;
+      border-radius: 999px;
+      background: #e8edf2;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), #2563eb);
+    }
+
+    .bar-value {
+      color: var(--muted);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .chart-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    figure {
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      overflow: hidden;
+      box-shadow: 0 12px 30px rgba(21, 32, 43, 0.05);
+    }
+
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: white;
+    }
+
+    figcaption {
+      padding: 12px 14px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .table-wrap {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      overflow-x: auto;
+      box-shadow: 0 12px 30px rgba(21, 32, 43, 0.05);
+    }
+
+    table {
+      width: 100%;
+      min-width: 920px;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: right;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    th {
+      color: var(--muted);
+      background: var(--soft);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    td:first-child,
+    th:first-child {
+      text-align: left;
+      font-weight: 800;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    tbody tr.best-speed td:first-child {
+      color: var(--accent);
+    }
+
+    .method-chip {
+      display: inline-block;
+      min-width: 76px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      color: #0e4743;
+      background: #e8f5f3;
+      text-align: center;
+    }
+
+    footer {
+      margin-top: 32px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 880px) {
+      .hero,
+      .leaderboard,
+      .chart-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .section-title {
+        align-items: start;
+        flex-direction: column;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .nav {
+        width: min(100% - 22px, 1180px);
+      }
+
+      main {
+        width: min(100% - 22px, 1180px);
+        padding-top: 26px;
+      }
+
+      .metrics {
+        grid-template-columns: 1fr;
+      }
+
+      .nav a {
+        display: none;
+      }
+
+      .bar-row {
+        grid-template-columns: 92px minmax(80px, 1fr) 78px;
+        gap: 9px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="nav">
+      <div class="brand">
+        <div class="mark">H</div>
+        <span>Heat2D Performance</span>
+      </div>
+      <a href="comparison_results.csv">CSV output</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="page-title">
+      <div>
+        <h1 id="page-title">2D Heat Solver Comparison</h1>
+        <p class="lead">Performance view for Serial, OpenMP, MPI, Hybrid MPI+OpenMP, and CUDA runs using the generated comparison output.</p>
+      </div>
+      <aside class="run-note">
+        <span>Fastest Method</span>
+        <strong id="fastestMethod">Calculating</strong>
+      </aside>
+    </section>
+
+    <section class="metrics" aria-label="Key comparison metrics">
+      <article class="metric">
+        <div class="label">Best Speedup <span class="badge">x</span></div>
+        <div class="value" id="bestSpeedup">-</div>
+        <div class="sub" id="bestSpeedupSub">-</div>
+      </article>
+      <article class="metric">
+        <div class="label">Lowest Time <span class="badge">ms</span></div>
+        <div class="value" id="lowestTime">-</div>
+        <div class="sub" id="lowestTimeSub">-</div>
+      </article>
+      <article class="metric">
+        <div class="label">Top Throughput <span class="badge">MP/s</span></div>
+        <div class="value" id="topThroughput">-</div>
+        <div class="sub" id="topThroughputSub">-</div>
+      </article>
+      <article class="metric">
+        <div class="label">Best CPU Efficiency <span class="badge">%</span></div>
+        <div class="value" id="bestEfficiency">-</div>
+        <div class="sub" id="bestEfficiencySub">-</div>
+      </article>
+    </section>
+
+    <section aria-labelledby="ranking-title">
+      <div class="section-title">
+        <div>
+          <h2 id="ranking-title">Ranked Results</h2>
+          <p>Bars are normalized to the best value in each panel.</p>
+        </div>
+      </div>
+      <div class="leaderboard">
+        <article class="rank-list">
+          <h3>Speedup</h3>
+          <div id="speedupBars"></div>
+        </article>
+        <article class="rank-list">
+          <h3>Throughput</h3>
+          <div id="throughputBars"></div>
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="charts-title">
+      <div class="section-title">
+        <div>
+          <h2 id="charts-title">Generated Charts</h2>
+          <p>Images are loaded from the existing comparison output folder.</p>
+        </div>
+      </div>
+      <div class="chart-grid">
+        <figure>
+          <img src="execution_time.png" alt="Execution time comparison chart">
+          <figcaption>Execution time by solver</figcaption>
+        </figure>
+        <figure>
+          <img src="speedup.png" alt="Speedup comparison chart">
+          <figcaption>Speedup relative to the serial baseline</figcaption>
+        </figure>
+        <figure>
+          <img src="efficiency.png" alt="Parallel efficiency comparison chart">
+          <figcaption>Parallel efficiency</figcaption>
+        </figure>
+        <figure>
+          <img src="throughput.png" alt="Throughput comparison chart">
+          <figcaption>Grid update throughput</figcaption>
+        </figure>
+        <figure>
+          <img src="rmse.png" alt="RMSE comparison chart">
+          <figcaption>Analytical RMSE</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section aria-labelledby="table-title">
+      <div class="section-title">
+        <div>
+          <h2 id="table-title">Comparison Table</h2>
+          <p>Formatted from <code>Compare/comparison_results.csv</code>.</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Solver</th>
+              <th>Workers</th>
+              <th>MPI Ranks</th>
+              <th>OMP Threads</th>
+              <th>Exec ms</th>
+              <th>Speedup</th>
+              <th>Efficiency</th>
+              <th>RMSE</th>
+              <th>RMSE vs Serial</th>
+              <th>Max Temp C</th>
+              <th>Throughput</th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      Run <code>Compare/compare</code> again to refresh <code>comparison_results.csv</code>, <code>comparison_results.js</code>, and the chart images.
+    </footer>
+  </main>
+
+  <script src="comparison_results.js"></script>
+  <script>
+    const fallbackRows = [
+      { solver: "Serial", workers: 1, mpi_ranks: 1, openmp_threads: 1, exec_ms: 4163.5178, speedup: 1.000000, efficiency_pct: 100.0000, rmse: 2.947695e-06, rmse_vs_serial: 0.000000e+00, max_temp_C: 90.600938, throughput_MPointsPerSec: 747.5650 },
+      { solver: "OpenMP-1T", workers: 1, mpi_ranks: 1, openmp_threads: 1, exec_ms: 5857.5226, speedup: 0.710798, efficiency_pct: 71.0798, rmse: 2.947695e-06, rmse_vs_serial: 0.000000e+00, max_temp_C: 90.600938, throughput_MPointsPerSec: 531.3680 },
+      { solver: "OpenMP-2T", workers: 2, mpi_ranks: 1, openmp_threads: 2, exec_ms: 3490.4232, speedup: 1.192840, efficiency_pct: 59.6420, rmse: 2.947695e-06, rmse_vs_serial: 0.000000e+00, max_temp_C: 90.600938, throughput_MPointsPerSec: 891.7257 },
+      { solver: "OpenMP-4T", workers: 4, mpi_ranks: 1, openmp_threads: 4, exec_ms: 2590.0179, speedup: 1.607525, efficiency_pct: 40.1881, rmse: 2.947695e-06, rmse_vs_serial: 0.000000e+00, max_temp_C: 90.600938, throughput_MPointsPerSec: 1201.7292 },
+      { solver: "OpenMP-8T", workers: 8, mpi_ranks: 1, openmp_threads: 8, exec_ms: 1952.0556, speedup: 2.132889, efficiency_pct: 26.6611, rmse: 2.947695e-06, rmse_vs_serial: 0.000000e+00, max_temp_C: 90.600938, throughput_MPointsPerSec: 1594.4730 },
+      { solver: "MPI-4R", workers: 4, mpi_ranks: 4, openmp_threads: 0, exec_ms: 2475.8200, speedup: 1.681672, efficiency_pct: 42.0418, rmse: 2.947690e-06, rmse_vs_serial: 2.880623e-07, max_temp_C: 90.600900, throughput_MPointsPerSec: 1257.1592 },
+      { solver: "Hybrid-4x2T", workers: 8, mpi_ranks: 4, openmp_threads: 2, exec_ms: 2654.1000, speedup: 1.568712, efficiency_pct: 19.6089, rmse: 2.947690e-06, rmse_vs_serial: 2.880623e-07, max_temp_C: 90.600900, throughput_MPointsPerSec: 1172.7139 },
+      { solver: "CUDA", workers: 0, mpi_ranks: 0, openmp_threads: 0, exec_ms: 1937.9500, speedup: 2.148413, efficiency_pct: 0.0000, rmse: 2.947700e-06, rmse_vs_serial: 0.000000e+00, max_temp_C: 90.600900, throughput_MPointsPerSec: 1606.0786 }
+    ];
+
+    const rows = Array.isArray(window.COMPARISON_RESULTS) && window.COMPARISON_RESULTS.length
+      ? window.COMPARISON_RESULTS
+      : fallbackRows;
+
+    const bySpeedup = [...rows].sort((a, b) => b.speedup - a.speedup);
+    const byThroughput = [...rows].sort((a, b) => b.throughput_MPointsPerSec - a.throughput_MPointsPerSec);
+    const byTime = [...rows].sort((a, b) => a.exec_ms - b.exec_ms);
+    const cpuRows = rows.filter((row) => row.solver !== "CUDA");
+    const byEfficiency = [...cpuRows].sort((a, b) => b.efficiency_pct - a.efficiency_pct);
+
+    const nf = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
+    const ms = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+
+    function setText(id, value) {
+      document.getElementById(id).textContent = value;
+    }
+
+    function renderBars(targetId, data, key, unit) {
+      const max = data[0][key];
+      const target = document.getElementById(targetId);
+      target.innerHTML = data.map((row) => {
+        const width = Math.max((row[key] / max) * 100, 3);
+        const value = key === "speedup"
+          ? `${row[key].toFixed(2)}x`
+          : `${nf.format(row[key])} ${unit}`;
+        return `
+          <div class="bar-row">
+            <div class="bar-name" title="${row.solver}">${row.solver}</div>
+            <div class="bar-track" aria-hidden="true"><div class="bar-fill" style="width:${width}%"></div></div>
+            <div class="bar-value">${value}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderTable() {
+      const bestSolver = bySpeedup[0].solver;
+      document.getElementById("resultsBody").innerHTML = rows.map((row) => `
+        <tr class="${row.solver === bestSolver ? "best-speed" : ""}">
+          <td><span class="method-chip">${row.solver}</span></td>
+          <td>${row.workers}</td>
+          <td>${row.mpi_ranks}</td>
+          <td>${row.openmp_threads}</td>
+          <td>${ms.format(row.exec_ms)}</td>
+          <td>${row.speedup.toFixed(3)}x</td>
+          <td>${row.efficiency_pct.toFixed(2)}%</td>
+          <td>${row.rmse.toExponential(3)}</td>
+          <td>${row.rmse_vs_serial.toExponential(3)}</td>
+          <td>${row.max_temp_C.toFixed(4)}</td>
+          <td>${nf.format(row.throughput_MPointsPerSec)}</td>
+        </tr>
+      `).join("");
+    }
+
+    setText("fastestMethod", `${byTime[0].solver} at ${ms.format(byTime[0].exec_ms)} ms`);
+    setText("bestSpeedup", `${bySpeedup[0].speedup.toFixed(2)}x`);
+    setText("bestSpeedupSub", bySpeedup[0].solver);
+    setText("lowestTime", `${ms.format(byTime[0].exec_ms)}`);
+    setText("lowestTimeSub", `${byTime[0].solver} execution time`);
+    setText("topThroughput", nf.format(byThroughput[0].throughput_MPointsPerSec));
+    setText("topThroughputSub", `${byThroughput[0].solver} MPoints/sec`);
+    setText("bestEfficiency", `${byEfficiency[0].efficiency_pct.toFixed(1)}%`);
+    setText("bestEfficiencySub", `${byEfficiency[0].solver} CPU run`);
+
+    renderBars("speedupBars", bySpeedup, "speedup", "");
+    renderBars("throughputBars", byThroughput, "throughput_MPointsPerSec", "MP/s");
+    renderTable();
+  </script>
+</body>
+</html>
