@@ -109,11 +109,16 @@ Summary files include grid dimensions, so mismatched summaries are skipped when 
 - `cuda/results_2d_cuda.csv`
 - `cuda/summary_2d_cuda.csv`
 - `Compare/comparison_results.csv`
+- `Compare/comparison_results.js`
+- `Compare/index.html`
 - `Compare/execution_time.png`
 - `Compare/speedup.png`
 - `Compare/efficiency.png`
 - `Compare/rmse.png`
 - `Compare/throughput.png`
+
+Open `Compare/index.html` in a browser to view the comparison dashboard. Re-run
+`Compare/compare` to refresh the dashboard data and chart images.
 
 ## Notes
 
